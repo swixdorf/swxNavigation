@@ -1,0 +1,31 @@
+{
+  "name": "swxnavigation",
+  "version": "1.1.2",
+  "description": "React Native Navigation",
+  "main": "index.d.ts",
+  "scripts": {
+    "test": "echo \"no test specified\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swixdorf/swxNavigation.git"
+  },
+  "keywords": [
+    "react-native",
+    "react",
+    "native",
+    "navigation",
+    "simple",
+    "lightweight"
+  ],
+  "author": "swixdorf",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/swixdorf/swxNavigation/issues"
+  },
+  "homepage": "https://github.com/swixdorf/swxNavigation#readme",
+  "dependencies": {
+    "react": "*",
+    "react-native": "*"
+  }
+}
