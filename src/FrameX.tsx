@@ -7,6 +7,8 @@ import {
     StyleSheet,
     GestureResponderEvent,
     Text,
+    Animated,
+    Easing,
 } from 'react-native'
 
 import { PartialRenderManager, PartialRenderView } from './PartialRender';
@@ -38,16 +40,42 @@ interface FrameXProps extends FrameXContent {
     initialPageName: string,
     style?: ViewStyle
 }
-interface ModalProps {
+interface ModalXProps {
     content: ReactNode,
     style?: ViewStyle,
     onClose?: Function,
     timeout?: number,
     uuid?: string
 }
+class ModalX extends React.Component<{ c_modal: ModalXProps, index: number, onClose?: Function }> {
+    state = { fadeAnim: new Animated.Value(0) };
+    componentDidMount() {
+        this.fadeIn();
+    }
+    fadeIn = () => {
+        Animated.timing(this.state.fadeAnim, { toValue: 1, duration: 700, easing: Easing.out(Easing.exp), useNativeDriver: true, }).start();
+    };
+
+    fadeOut = () => {
+        Animated.timing(this.state.fadeAnim, { toValue: 0, duration: 700, easing: Easing.out(Easing.exp), useNativeDriver: true }).start(() => { this.props.onClose && this.props.onClose() });
+    };
+    render() {
+        const { c_modal, index, onClose } = this.props;
+        return (
+            <Animated.View
+                onStartShouldSetResponder={(e) => { this.fadeOut(); return true }}
+                key={c_modal.uuid}
+                style={[styles.modalMainContainer, { zIndex: (1000 + index), elevation: (1000 + index), opacity: this.state.fadeAnim, transform: [{ scale: this.state.fadeAnim }] }]}>
+                <View onStartShouldSetResponder={(e) => true} style={[styles.modalContainer, c_modal.style]}>
+                    {c_modal.content}
+                </View>
+            </Animated.View>
+        );
+    }
+}
 class FrameX extends React.Component<FrameXProps, { content: FrameXContent, drawerX: number, hideViews: hideView }> {
     private _viewRefs: { [key: string]: React.RefObject<PartialRenderView> };
-    static modalStack: ModalProps[] = [];
+    static modalStack: ModalXProps[] = [];
     prevX: number = 0;
     prevY: number = 0;
     constructor(props: FrameXProps) {
@@ -79,29 +107,24 @@ class FrameX extends React.Component<FrameXProps, { content: FrameXContent, draw
             __DEV__ && console.log("FrameX :: renderCallback Invalid Parameter");
         return true;
     }
-    static renderModal() {
+    static renderModals() {
         const contentToRender = FrameX.modalStack.map((c_modal, index) => {
-            return c_modal.content &&
-                <SafeAreaView onStartShouldSetResponder={(e) => { this.closeModal(); return true }} key={c_modal.uuid} style={[styles.modalMainContainer, { zIndex: (1000 + index), elevation: (1000 + index) }]}>
-                    <View onStartShouldSetResponder={(e) => true} style={[styles.modalContainer, c_modal.style]}>
-                        {c_modal.content}
-                    </View>
-                </SafeAreaView>
+            return c_modal.content && <ModalX key={`m_${index}`} c_modal={c_modal} index={index} onClose={this.closeModal} />
         })
         PartialRenderManager.find('Absolute').updateContent(contentToRender);
         PartialRenderManager.find('Frame').forceUpdate();
     }
-    static showModal(modal: ModalProps) {
+    static showModal(modal: ModalXProps) {
         const date = new Date();
         modal.uuid = date.getTime().toString() + date.getMilliseconds() + Math.random().toString();
         FrameX.modalStack.push(modal);
         modal.timeout && setTimeout(() => { FrameX.closeModal(modal.uuid); }, modal.timeout);
-        FrameX.renderModal();
+        FrameX.renderModals();
     }
     static closeModal(modalUuid?: string) {
         const modalIndex = modalUuid ? FrameX.modalStack.findIndex(modal => modal.uuid == modalUuid) : -1;
-        const modalToClose = modalIndex != -1 ? FrameX.modalStack.splice(modalIndex, 1)[0] : FrameX.modalStack.pop() as ModalProps;
-        ((modalUuid && modalIndex != -1) || !modalUuid) && FrameX.renderModal();
+        const modalToClose = modalIndex != -1 ? FrameX.modalStack.splice(modalIndex, 1)[0] : FrameX.modalStack.pop() as ModalXProps;
+        ((modalUuid && modalIndex != -1) || !modalUuid) && FrameX.renderModals();
         modalToClose && modalToClose.onClose && modalToClose.onClose(modalToClose);
         return true;
     }
@@ -119,7 +142,6 @@ class FrameX extends React.Component<FrameXProps, { content: FrameXContent, draw
         }
         else
             this.setState({ drawerX: relX < styles.drawerStyle.width ? relX : styles.drawerStyle.width });
-        console.log(type, evt.nativeEvent.locationX, evt.nativeEvent.locationY, relX, relY);
     }
     render(): React.ReactNode {
         const { top, left, mid, right, bottom, drawer } = this.props;
