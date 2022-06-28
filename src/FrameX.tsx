@@ -5,6 +5,8 @@ import {
     BackHandler,
     ViewStyle,
     StyleSheet,
+    GestureResponderEvent,
+    Text,
 } from 'react-native'
 
 import { PartialRenderManager, PartialRenderView } from './PartialRender';
@@ -28,11 +30,12 @@ interface FrameXContent {
     left?: ReactNode,
     mid?: ReactNode,
     right?: ReactNode,
-    bottom?: ReactNode
+    bottom?: ReactNode,
+    drawer?: ReactNode,
 }
 interface FrameXProps extends FrameXContent {
     pages: PageInterface[],
-    initialPageName:string,
+    initialPageName: string,
     style?: ViewStyle
 }
 interface ModalProps {
@@ -42,12 +45,14 @@ interface ModalProps {
     timeout?: number,
     uuid?: string
 }
-class FrameX extends React.Component<FrameXProps, { content: FrameXContent, hideViews: hideView }> {
+class FrameX extends React.Component<FrameXProps, { content: FrameXContent, drawerX: number, hideViews: hideView }> {
     private _viewRefs: { [key: string]: React.RefObject<PartialRenderView> };
     static modalStack: ModalProps[] = [];
+    prevX: number = 0;
+    prevY: number = 0;
     constructor(props: FrameXProps) {
         super(props);
-        this.state = { content: props, hideViews: hideView.None };
+        this.state = { content: props, drawerX: 0.2, hideViews: hideView.None };
         this.renderCallback = this.renderCallback.bind(this);
         RouteX.init({ authChecker: () => { return true; }, renderCallback: this.renderCallback, pages: props.pages, initialPageName: this.props.initialPageName });
         this._viewRefs = { top: createRef(), left: createRef(), mid: createRef(), right: createRef(), bottom: createRef(), absolute: createRef() };
@@ -100,12 +105,34 @@ class FrameX extends React.Component<FrameXProps, { content: FrameXContent, hide
         modalToClose && modalToClose.onClose && modalToClose.onClose(modalToClose);
         return true;
     }
+    gestureHandler(evt: GestureResponderEvent, type: "start" | "end" | "move") {
+        if (!this.props.drawer)
+            return
+        if (type == "start") {
+            this.prevX = evt.nativeEvent.locationX;
+            this.prevY = evt.nativeEvent.locationY
+        }
+        const relX = evt.nativeEvent.locationX - this.prevX;
+        const relY = evt.nativeEvent.locationY - this.prevY;
+        if (type == "end") {
+            this.setState({ drawerX: relX > 100 ? styles.drawerStyle.width : 0 });
+        }
+        else
+            this.setState({ drawerX: relX < styles.drawerStyle.width ? relX : styles.drawerStyle.width });
+        console.log(type, evt.nativeEvent.locationX, evt.nativeEvent.locationY, relX, relY);
+    }
     render(): React.ReactNode {
-        const { top, left, mid, right, bottom } = this.props;
+        const { top, left, mid, right, bottom, drawer } = this.props;
         return (
-            <>
+            <View onStartShouldSetResponder={(evt) => { this.gestureHandler(evt, "start"); return true; }}
+                onResponderMove={evt => this.gestureHandler(evt, "move")}
+                onResponderRelease={evt => this.gestureHandler(evt, "end")}>
                 <PartialRenderView ref={this._viewRefs.absolute} name={'Absolute'} content={null} />
-                <SafeAreaView pointerEvents={FrameX.modalStack.length > 0 ? 'none' : 'auto'} style={[styles.frameContainer, this.props.style]}>
+                <View onStartShouldSetResponder={(e) => true} style={[styles.drawerStyle, { transform: [{ translateX: -1 * styles.drawerStyle.width + this.state.drawerX }] }]}>
+                    <PartialRenderView ref={this._viewRefs.drawer} name={'Drawer'} content={drawer} />
+                </View>
+                <SafeAreaView
+                    pointerEvents={FrameX.modalStack.length > 0 || this.state.drawerX == styles.drawerStyle.width ? 'none' : 'auto'} style={[styles.frameContainer, this.props.style]}>
                     <PartialRenderView ref={this._viewRefs.top} name={'Top'} content={top} />
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignSelf: 'stretch', flex: 1 }}>
                         <PartialRenderView ref={this._viewRefs.left} name={'Left'} content={left} />
@@ -114,12 +141,23 @@ class FrameX extends React.Component<FrameXProps, { content: FrameXContent, hide
                     </View>
                     <PartialRenderView ref={this._viewRefs.bottom} name={'Bottom'} content={bottom} />
                 </SafeAreaView>
-            </>
+            </View>
         );
     }
 }
 
 const styles = StyleSheet.create({
+    drawerStyle:
+    {
+        position: 'absolute',
+        width: 200,
+        height: "100%",
+        backgroundColor: "white",
+        borderRightColor: "lightgrey",
+        borderRightWidth: 2,
+        elevation: 1,
+        zIndex: 1
+    },
     frameContainer: {
         flexDirection: 'column',
         justifyContent: 'space-between',
@@ -145,5 +183,5 @@ const styles = StyleSheet.create({
 })
 const showModal = FrameX.showModal;
 export type { FrameXContent, FramePageInterface }
-export { showModal, hideView,FrameX };
+export { showModal, hideView, FrameX };
 export default FrameX;
